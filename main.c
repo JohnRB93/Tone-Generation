@@ -32,6 +32,8 @@
  */
 
 /*
+ * **** Connections ****
+ * 
  * **PWM Output Signal**
  * Tim3, Channel 1 ------> PA6
  *
@@ -97,19 +99,52 @@
 #define B4_BIT 6U
 #define C5_BIT 7U
 
+#define C4_BEND_UP_RANGE 0.3268
+#define D4_BEND_UP_RANGE 0.3670
+#define E4_BEND_UP_RANGE 0.4118
+#define F4_BEND_UP_RANGE 0.4364
+#define G4_BEND_UP_RANGE 0.4897
+#define A4_BEND_UP_RANGE 0.5498
+#define B4_BEND_UP_RANGE 0.6172
+#define C5_BEND_UP_RANGE 0.6539
+
+#define C4_BEND_DOWN_RANGE 0.2025
+#define D4_BEND_DOWN_RANGE 0.2271
+#define E4_BEND_DOWN_RANGE 0.2551
+#define F4_BEND_DOWN_RANGE 0.2702
+#define G4_BEND_DOWN_RANGE 0.3033
+#define A4_BEND_DOWN_RANGE 0.3404
+#define B4_BEND_DOWN_RANGE 0.3821
+#define C5_BEND_DOWN_RANGE 0.4049
+
 #define NORMAL_DUTY_CYCLE 50
 
 /************ Global Variables ********************************************************************************/
 uint8_t adcChannels[] = {ADC_IN10, ADC_IN11};
 uint16_t analogData[] = {0, 0};
+
 uint16_t CurrentAnalogReadX = 0;
 uint16_t CurrentAnalogReadY = 0;
 uint16_t PreviousAnalogReadX = 0;
 uint16_t PreviousAnalogReadY = 0;
+
 uint8_t butnsPressed = 0;
 uint8_t toneFlag = 0;
+
 float toneFrequency = 0.0;
 float toneFrequencies[] = {NOTE_C4, NOTE_D4, NOTE_E4, NOTE_F4, NOTE_G4, NOTE_A4, NOTE_B4, NOTE_C5};
+
+float pitchBendUpRanges[] = {
+		C4_BEND_UP_RANGE, D4_BEND_UP_RANGE, E4_BEND_UP_RANGE, F4_BEND_UP_RANGE,
+		G4_BEND_UP_RANGE, A4_BEND_UP_RANGE, B4_BEND_UP_RANGE, C5_BEND_UP_RANGE
+};
+float pitchBendUpRange = 0.0;
+
+float pitchBendDownRanges[] = {
+		C4_BEND_DOWN_RANGE, D4_BEND_DOWN_RANGE, E4_BEND_DOWN_RANGE, F4_BEND_DOWN_RANGE,
+		G4_BEND_DOWN_RANGE, A4_BEND_DOWN_RANGE, B4_BEND_DOWN_RANGE, C5_BEND_DOWN_RANGE
+};
+float pitchBendDownRange = 0.0;
 /**************************************************************************************************************/
 
 /************ Function Headers ********************************************************************************/
@@ -216,25 +251,49 @@ void DMA2_Stream0_IRQHandler(void)
 	printf("Raw Analog Value:       %d\n", analogData[0]);
 	printf("Converted Analog Value: %d\n", CurrentAnalogReadY);
 	printf("Button Frequency:       %f\n", toneFrequency);
-	//TIM_Delay_ms(TIM3, 20);
+	//TIM_Delay_ms(TIM3, 50);
 	if(toneFlag == 1)
 	{
-		int diff = CurrentAnalogReadY - PreviousAnalogReadY;
-		if(diff >= 2)
+
+		if(CurrentAnalogReadY > 140) // Pitch is being bent higher than nornal level.
 		{
-			toneFrequency += (0.3268 * diff);
-			printf("Frequency Output:       %f\n\n", toneFrequency);
-			TIM_SetPWM_Frequency(TIM3, toneFrequency);
-			TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
-			PreviousAnalogReadY = CurrentAnalogReadY;
+			int diff = CurrentAnalogReadY - PreviousAnalogReadY;
+			if(diff >= 2)
+			{
+				toneFrequency += (pitchBendUpRange * diff);
+				printf("Frequency Output:       %f\n\n", toneFrequency);
+				TIM_SetPWM_Frequency(TIM3, toneFrequency);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
+				PreviousAnalogReadY = CurrentAnalogReadY;
+			}
+			else if(diff <= -2)
+			{
+				toneFrequency += (pitchBendUpRange * diff);
+				printf("Frequency Output:       %f\n\n", toneFrequency);
+				TIM_SetPWM_Frequency(TIM3, toneFrequency);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
+				PreviousAnalogReadY = CurrentAnalogReadY;
+			}
 		}
-		else if(diff <= -2)
+		else if(CurrentAnalogReadY < 138) // Pitch is being bent lower than nornal level.
 		{
-			toneFrequency += (0.3268 * diff);
-			printf("Frequency Output:       %f\n\n", toneFrequency);
-			TIM_SetPWM_Frequency(TIM3, toneFrequency);
-			TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
-			PreviousAnalogReadY = CurrentAnalogReadY;
+			int diff = CurrentAnalogReadY - PreviousAnalogReadY;
+			if(diff >= 2)
+			{
+				toneFrequency += (pitchBendDownRange * diff);
+				printf("Frequency Output:       %f\n\n", toneFrequency);
+				TIM_SetPWM_Frequency(TIM3, toneFrequency);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
+				PreviousAnalogReadY = CurrentAnalogReadY;
+			}
+			else if(diff <= -2)
+			{
+				toneFrequency += (pitchBendDownRange * diff);
+				printf("Frequency Output:       %f\n\n", toneFrequency);
+				TIM_SetPWM_Frequency(TIM3, toneFrequency);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
+				PreviousAnalogReadY = CurrentAnalogReadY;
+			}
 		}
 	}
 }
@@ -252,6 +311,8 @@ extern void GPIO_ApplicationEventCallBack(uint8_t pinNumber)
 				TIM_SetPWM_Frequency(TIM3, toneFrequency);
 				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
 				toneFlag = 1;
+				pitchBendUpRange = pitchBendUpRanges[i];
+				pitchBendDownRange = pitchBendDownRanges[i];
 				BIT_SET(butnsPressed, i);
 			}
 			else
@@ -259,10 +320,13 @@ extern void GPIO_ApplicationEventCallBack(uint8_t pinNumber)
 				TIM_StopTimer(TIM3);
 				toneFrequency = 0;
 				toneFlag = 0;
+				pitchBendUpRange = 0.0;
 				butnsPressed = 0;
 			}
 		}
 	}
 }
+
+/**************************************************************************************************************/
 
 /**************************************************************************************************************/
