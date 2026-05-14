@@ -7,6 +7,7 @@
 /* x = value, y = bit to toggle */
 #define BIT_TOGGLE(x, y) ((x) ^= (0x1 << (y)))
 
+
 /*
  * **** Program Summary ****
  *
@@ -33,7 +34,7 @@
 
 /*
  * **** Connections ****
- * 
+ *
  * **PWM Output Signal**
  * Tim3, Channel 1 ------> PA6
  *
@@ -118,6 +119,11 @@
 #define C5_BEND_DOWN_RANGE 0.4049
 
 #define NORMAL_DUTY_CYCLE 50
+#define LOW_DUTY_CYCLE    10
+#define HIGH_DUTY_CYCLE   90
+
+#define LOW_DUTY_CYCLE_RANGE 0.3305
+#define HIGH_DUTY_CYCLE_RANGE 0.3361
 
 /************ Global Variables ********************************************************************************/
 uint8_t adcChannels[] = {ADC_IN10, ADC_IN11};
@@ -145,6 +151,8 @@ float pitchBendDownRanges[] = {
 		G4_BEND_DOWN_RANGE, A4_BEND_DOWN_RANGE, B4_BEND_DOWN_RANGE, C5_BEND_DOWN_RANGE
 };
 float pitchBendDownRange = 0.0;
+
+uint8_t dutyCycle = 0;
 /**************************************************************************************************************/
 
 /************ Function Headers ********************************************************************************/
@@ -248,54 +256,82 @@ void DMA2_Stream0_IRQHandler(void)
 {
 	ADC_HandleDMA_TransferFlag();
 	CurrentAnalogReadY = (uint16_t)(((ADC_CONV_MAX / ADC_MAX) * analogData[0]) - (ADC_CONV_MAX / ADC_MAX));
-	printf("Raw Analog Value:       %d\n", analogData[0]);
-	printf("Converted Analog Value: %d\n", CurrentAnalogReadY);
-	printf("Button Frequency:       %f\n", toneFrequency);
-	//TIM_Delay_ms(TIM3, 50);
+	CurrentAnalogReadX = (uint16_t)(((ADC_CONV_MAX / ADC_MAX) * analogData[1]) - (ADC_CONV_MAX / ADC_MAX));
+	printf("Converted Analog Value Y: %d\n", CurrentAnalogReadY);
+	printf("Converted Analog Value X: %d\n", CurrentAnalogReadX);
+
 	if(toneFlag == 1)
 	{
-
-		if(CurrentAnalogReadY > 140) // Pitch is being bent higher than nornal level.
+		/** Pitich Bending **/
+		if(CurrentAnalogReadY > 144) // Y-axis is higher than nornal.
 		{
-			int diff = CurrentAnalogReadY - PreviousAnalogReadY;
-			if(diff >= 2)
+			int16_t diffY = CurrentAnalogReadY - PreviousAnalogReadY;
+			if(diffY >= 2)
 			{
-				toneFrequency += (pitchBendUpRange * diff);
-				printf("Frequency Output:       %f\n\n", toneFrequency);
+				toneFrequency += (pitchBendUpRange * diffY);
 				TIM_SetPWM_Frequency(TIM3, toneFrequency);
-				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
 				PreviousAnalogReadY = CurrentAnalogReadY;
 			}
-			else if(diff <= -2)
+			else if(diffY <= -2)
 			{
-				toneFrequency += (pitchBendUpRange * diff);
-				printf("Frequency Output:       %f\n\n", toneFrequency);
+				toneFrequency += (pitchBendUpRange * diffY);
 				TIM_SetPWM_Frequency(TIM3, toneFrequency);
-				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
 				PreviousAnalogReadY = CurrentAnalogReadY;
 			}
 		}
-		else if(CurrentAnalogReadY < 138) // Pitch is being bent lower than nornal level.
+		else if(CurrentAnalogReadY < 141) // Y-axis is lower than nornal.
 		{
-			int diff = CurrentAnalogReadY - PreviousAnalogReadY;
-			if(diff >= 2)
+			int16_t diffY = CurrentAnalogReadY - PreviousAnalogReadY;
+			if(diffY >= 2)
 			{
-				toneFrequency += (pitchBendDownRange * diff);
-				printf("Frequency Output:       %f\n\n", toneFrequency);
+				toneFrequency += (pitchBendDownRange * diffY);
 				TIM_SetPWM_Frequency(TIM3, toneFrequency);
-				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
 				PreviousAnalogReadY = CurrentAnalogReadY;
 			}
-			else if(diff <= -2)
+			else if(diffY <= -2)
 			{
-				toneFrequency += (pitchBendDownRange * diff);
-				printf("Frequency Output:       %f\n\n", toneFrequency);
+				toneFrequency += (pitchBendDownRange * diffY);
 				TIM_SetPWM_Frequency(TIM3, toneFrequency);
-				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
 				PreviousAnalogReadY = CurrentAnalogReadY;
+			}
+		}
+
+		/** Pulse Width Modulation **/
+		if(CurrentAnalogReadX > 121) // X-axis is higher than nornal.
+		{
+			int16_t diffX = CurrentAnalogReadX - PreviousAnalogReadX;
+			if(diffX >= 2)
+			{
+				dutyCycle += (HIGH_DUTY_CYCLE_RANGE * diffX);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, dutyCycle);
+				PreviousAnalogReadX = CurrentAnalogReadX;
+			}
+			else if(diffX <= -2)
+			{
+				dutyCycle -= (HIGH_DUTY_CYCLE_RANGE * -diffX);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, dutyCycle);
+				PreviousAnalogReadX = CurrentAnalogReadX;
+			}
+		}
+		else if(CurrentAnalogReadX < 113) // X-axis is lower than normal.
+		{
+			int16_t diffX = CurrentAnalogReadX - PreviousAnalogReadX;
+			if(diffX >= 2)
+			{
+				dutyCycle += (LOW_DUTY_CYCLE_RANGE * diffX);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, dutyCycle);
+				PreviousAnalogReadX = CurrentAnalogReadX;
+			}
+			else if(diffX <= -2)
+			{
+				dutyCycle -= (LOW_DUTY_CYCLE_RANGE * -diffX);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, dutyCycle);
+				PreviousAnalogReadX = CurrentAnalogReadX;
 			}
 		}
 	}
+	printf("Button Frequency:         %f\n", toneFrequency);
+	printf("Button Duty Cycle:        %d\n\n", dutyCycle);
 }
 
 extern void GPIO_ApplicationEventCallBack(uint8_t pinNumber)
@@ -308,8 +344,9 @@ extern void GPIO_ApplicationEventCallBack(uint8_t pinNumber)
 			{
 				TIM_SartTimer(TIM3);
 				toneFrequency = toneFrequencies[i];
+				dutyCycle = NORMAL_DUTY_CYCLE;
 				TIM_SetPWM_Frequency(TIM3, toneFrequency);
-				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, NORMAL_DUTY_CYCLE);
+				TIM_SetPWM_DutyCycle(TIM3, toneFrequency, dutyCycle);
 				toneFlag = 1;
 				pitchBendUpRange = pitchBendUpRanges[i];
 				pitchBendDownRange = pitchBendDownRanges[i];
@@ -319,6 +356,7 @@ extern void GPIO_ApplicationEventCallBack(uint8_t pinNumber)
 			{
 				TIM_StopTimer(TIM3);
 				toneFrequency = 0;
+				dutyCycle = NORMAL_DUTY_CYCLE;
 				toneFlag = 0;
 				pitchBendUpRange = 0.0;
 				butnsPressed = 0;
@@ -326,7 +364,5 @@ extern void GPIO_ApplicationEventCallBack(uint8_t pinNumber)
 		}
 	}
 }
-
-/**************************************************************************************************************/
 
 /**************************************************************************************************************/
